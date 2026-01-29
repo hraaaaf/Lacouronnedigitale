@@ -6,6 +6,16 @@ const connectDB = require('./config/db');
 // Initialiser Express
 const app = express();
 
+// Vérification de sécurité pour Railway/Production
+console.log('--- Diagnostic de démarrage ---');
+console.log('📍 Environnement:', process.env.NODE_ENV || 'development');
+if (!process.env.MONGODB_URI) {
+    console.error('❌ ERREUR: La variable MONGODB_URI est introuvable dans les variables d\'environnement.');
+} else {
+    console.log('✅ Variable MONGODB_URI détectée.');
+}
+console.log('-------------------------------');
+
 // Connexion à la base de données
 connectDB();
 
@@ -31,13 +41,15 @@ app.get('/', (req, res) => {
   res.json({
     message: '🦷 API Dental Marketplace v1.0',
     status: 'actif',
+    database: process.env.MONGODB_URI ? 'configurée' : 'non configurée',
     endpoints: {
       auth: '/api/auth',
       produits: '/api/produits',
       commandes: '/api/commandes',
       messages: '/api/messages',
       users: '/api/users',
-      upload: '/api/upload'
+      upload: '/api/upload',
+      reviews: '/api/reviews'
     }
   });
 });
@@ -51,8 +63,9 @@ app.use((req, res) => {
 });
 
 // Démarrer le serveur
+// Railway injecte automatiquement sa propre variable PORT, on doit la prioriser
 const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
-  console.log(`📍 Environnement: ${process.env.NODE_ENV}`);
 });
