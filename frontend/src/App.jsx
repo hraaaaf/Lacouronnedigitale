@@ -18,6 +18,7 @@ import Orders from './pages/Orders';
 import Messages from './pages/Messages';
 import Profile from './pages/Profile';
 import AddProduct from './pages/AddProduct';
+import APropos from './pages/APropos';
 import MyProducts from './pages/MyProducts'; // AJOUTÉ : Importation de la page inventaire
 
 // Composant de protection des routes
@@ -113,6 +114,14 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
+
+            <Route 
+              path="/a-propos" 
+              element={
+                <APropos />
+              } 
+            />
+
             <Route
               path="/profil"
               element={
