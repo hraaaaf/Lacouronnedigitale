@@ -27,4 +27,4 @@ const reviewSchema = new mongoose.Schema({
 // Un utilisateur ne peut laisser qu'un seul avis par produit
 reviewSchema.index({ produit: 1, utilisateur: 1 }, { unique: true });
 
-module.exports = mongoose.mongo.model('Review', reviewSchema);
+module.exports = mongoose.model('Review', reviewSchema);
