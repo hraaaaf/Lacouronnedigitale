@@ -19,12 +19,22 @@ console.log('-------------------------------');
 // Connexion à la base de données
 connectDB();
 
-// Middleware
-app.use(cors({
-  origin: 'https://lacouronnedigitale.vercel.app', // Ton URL Vercel
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// --- CONFIGURATION CORS AMÉLIORÉE ---
+const corsOptions = {
+  origin: 'https://lacouronnedigitale.vercel.app', // Ton domaine Vercel exact
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+// Appliquer CORS à toutes les routes
+app.use(cors(corsOptions));
+
+// Gérer explicitement les requêtes de "pré-vérification" (Preflight)
+app.options('*', cors(corsOptions));
+
+// Autres Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
