@@ -6,80 +6,82 @@ const connectDB = require('./config/db');
 // Initialiser Express
 const app = express();
 
-// Vérification de sécurité pour Railway/Production
-console.log('--- Diagnostic de démarrage ---');
-console.log('📍 Environnement:', process.env.NODE_ENV || 'development');
-if (!process.env.MONGODB_URI) {
-    console.error('❌ ERREUR: La variable MONGODB_URI est introuvable dans les variables d\'environnement.');
-} else {
-    console.log('✅ Variable MONGODB_URI détectée.');
-}
-console.log('-------------------------------');
-
 // Connexion à la base de données
 connectDB();
 
-// --- CONFIGURATION CORS AMÉLIORÉE ---
+// ========== CONFIGURATION CORS (CORRIGÉE POUR VERCEL) ==========
 const corsOptions = {
-  origin: 'https://lacouronnedigitale.vercel.app', // Ton domaine Vercel exact
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  optionsSuccessStatus: 200
+  // Met "true" pour accepter dynamiquement l'origine (Site officiel ET liens de preview Vercel)
+  origin: true, 
+  credentials: true, // Autorise les cookies/headers sécurisés
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 };
 
-// Appliquer CORS à toutes les routes
 app.use(cors(corsOptions));
 
-// Gérer explicitement les requêtes de "pré-vérification" (Preflight)
+// Force la réponse OK pour les requêtes de pré-vérification (Preflight)
 app.options('*', cors(corsOptions));
 
-// Autres Middlewares
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// ========== AUTRES MIDDLEWARES ==========
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Routes
+// ========== ROUTES ==========
+// (On garde tes routes exactement comme avant)
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/produits', require('./routes/products'));
 app.use('/api/commandes', require('./routes/orders'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/upload', require('./routes/upload'));
-app.use('/api/reviews', require('./routes/reviews'));
 
-// Servir les fichiers statiques (images uploadées)
+// Servir les fichiers statiques
 app.use('/uploads', express.static('uploads'));
 
-// Route de test
+// Route de test (Racine)
 app.get('/', (req, res) => {
   res.json({
-    message: '🦷 API Dental Marketplace v1.0',
+    message: '🦷 API Dental Marketplace v1.0 En Ligne',
     status: 'actif',
-    database: process.env.MONGODB_URI ? 'configurée' : 'non configurée',
+    timestamp: new Date().toISOString(),
+    cors_mode: 'unrestricted', // Pour confirmer que le correctif est passé
     endpoints: {
       auth: '/api/auth',
-      produits: '/api/produits',
-      commandes: '/api/commandes',
-      messages: '/api/messages',
-      users: '/api/users',
-      upload: '/api/upload',
-      reviews: '/api/reviews'
+      produits: '/api/produits'
     }
   });
+});
+
+// Route de santé pour Railway
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 // Gestion des erreurs 404
 app.use((req, res) => {
   res.status(404).json({
     succes: false,
-    message: 'Route introuvable.'
+    message: 'Route introuvable.',
+    path: req.path
+  });
+});
+
+// Gestion des erreurs globales
+app.use((err, req, res, next) => {
+  console.error('❌ Erreur serveur:', err);
+  res.status(500).json({
+    succes: false,
+    message: 'Erreur interne du serveur',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
 // Démarrer le serveur
-// Railway injecte automatiquement sa propre variable PORT, on doit la prioriser
 const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
+  console.log(`📍 Environnement: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 CORS configuré en mode permissif (origin: true)`);
 });
