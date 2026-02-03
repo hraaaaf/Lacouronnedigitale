@@ -118,7 +118,7 @@ router.post('/', proteger, autoriser('fournisseur'), verifierAbonnement, upload.
     let imagesUrls = [];
     if (req.files && req.files.length > 0) {
       imagesUrls = req.files.map(file => ({
-        url: `${req.protocol}://${req.get('host')}/uploads/${file.filename}`,
+        url: `/uploads/${file.filename}`, // Chemin relatif
         public_id: file.filename
       }));
     }
