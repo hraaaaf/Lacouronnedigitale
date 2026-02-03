@@ -6,9 +6,6 @@ const API_URL = import.meta.env.VITE_API_URL || 'https://lacouronnedigitale-prod
 // Instance Axios configurée
 const api = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Intercepteur pour ajouter le token JWT à chaque requête
@@ -50,7 +47,9 @@ export const authAPI = {
 export const produitsAPI = {
   getAll: (params) => api.get('/produits', { params }),
   getById: (id) => api.get(`/produits/${id}`),
-  create: (data) => api.post('/produits', data),
+  create: (data) => api.post('/produits', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
   update: (id, data) => api.put(`/produits/${id}`, data),
   delete: (id) => api.delete(`/produits/${id}`),
   getMesProduits: () => api.get('/produits/fournisseur/mes-produits'),
