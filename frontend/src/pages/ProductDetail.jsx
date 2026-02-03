@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { produitsAPI, messagesAPI } from '../utils/api';
 import { AuthContext } from '../context/AuthContext';
 import { ShoppingCart, Star, MessageCircle, Package, Truck, Shield, ChevronLeft, MapPin, Heart, Share2, Eye, CheckCircle } from 'lucide-react';
+import { getImageUrl } from '../utils/imageHelper';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -40,7 +41,7 @@ const ProductDetail = () => {
         nom: produit.nom,
         prix: produit.prix,
         quantite,
-        image: produit.images?.[0]?.url
+        image: getImageUrl(produit.images?.[0]?.url)
       });
     }
 
@@ -83,7 +84,9 @@ const ProductDetail = () => {
     );
   }
 
-  const images = produit.images?.length ? produit.images : [{ url: 'https://via.placeholder.com/600x600?text=Produit' }];
+  const images = produit.images?.length
+    ? produit.images.map(img => ({ ...img, url: getImageUrl(img.url) }))
+    : [{ url: 'https://placehold.co/600x600?text=Produit&font=inter' }];
   const prixAffiche = produit.enPromo?.actif ? produit.enPromo.prixPromo : produit.prix;
 
   return (

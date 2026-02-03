@@ -1,13 +1,13 @@
 import { Link } from 'react-router-dom';
 import { ShoppingCart, Star, Eye, Heart, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
+import { getProductImage } from '../utils/imageHelper';
 
 const ProductCard = ({ produit }) => {
-  console.log("Données du produit reçu:", produit.nom, produit.images);
   const [isLiked, setIsLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   
-  const imageUrl = produit.images?.[0]?.url || 'https://via.placeholder.com/400x400?text=Produit';
+  const imageUrl = getProductImage(produit);
   const prixAffiche = produit.enPromo?.actif ? produit.enPromo.prixPromo : produit.prix;
   const reduction = produit.enPromo?.actif 
     ? Math.round(((produit.prix - produit.enPromo.prixPromo) / produit.prix) * 100)
