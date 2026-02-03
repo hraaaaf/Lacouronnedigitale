@@ -1,10 +1,10 @@
 import axios from 'axios';
 
-// URL de base de l'API - Utilise la variable d'env pour le déploiement
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// URL de base de l'API
+const API_URL = import.meta.env.VITE_API_URL || 'https://lacouronnedigitale-production.up.railway.app/api';
 
-// Instance Axios configurée - ON AJOUTE "export" ICI
-export const api = axios.create({
+// Instance Axios configurée
+const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
