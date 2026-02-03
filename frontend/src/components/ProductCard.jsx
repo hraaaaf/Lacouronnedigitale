@@ -3,6 +3,7 @@ import { ShoppingCart, Star, Eye, Heart, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 
 const ProductCard = ({ produit }) => {
+  console.log("Données du produit reçu:", produit.nom, produit.images);
   const [isLiked, setIsLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   
