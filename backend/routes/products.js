@@ -3,6 +3,7 @@ const router = express.Router();
 const Product = require('../models/Product');
 const upload = require('../middleware/upload'); // Assure-toi que ce fichier existe bien
 const { proteger, autoriser, verifierAbonnement } = require('../middleware/auth');
+const cloudinary = require('cloudinary').v2; 
 
 // @route   GET /api/produits
 // @desc    Récupérer tous les produits (avec filtres, pagination, recherche)
@@ -115,12 +116,43 @@ router.get('/:id', async (req, res) => {
 router.post('/', proteger, autoriser('fournisseur'), verifierAbonnement, upload.array('images', 5), async (req, res) => {
   try {
     // 1. Gestion des Images (Multer)
+    
     let imagesUrls = [];
     if (req.files && req.files.length > 0) {
-      imagesUrls = req.files.map(file => ({
-        url: `/uploads/${file.filename}`, // Chemin relatif
-        public_id: file.filename
+    try {
+      // Upload vers Cloudinary
+      const uploadPromises = req.files.map(file => 
+        cloudinary.uploader.upload(file.path, {
+          folder: 'produits',
+          resource_type: 'image',
+          transformation: [
+            { width: 800, height: 800, crop: 'limit' },
+            { quality: 'auto:good' }
+          ]
+        })
+      );
+      
+      const results = await Promise.all(uploadPromises);
+      
+      imagesUrls = results.map(result => ({
+        url: result.secure_url,  // URL publique permanente
+        public_id: result.public_id,
+        altText: req.body.nom || ''
       }));
+      
+      // Supprimer les fichiers temporaires
+      req.files.forEach(file => {
+        require('fs').unlinkSync(file.path);
+      });
+      
+    } catch (uploadError) {
+      console.error('Erreur upload Cloudinary:', uploadError);
+      // Supprimer les fichiers temporaires en cas d'erreur
+      req.files.forEach(file => {
+        require('fs').unlinkSync(file.path).catch(() => {});
+      });
+      throw uploadError;
+    }
     }
 
     // 2. Gestion des caractéristiques (Parsing JSON ou Array)
