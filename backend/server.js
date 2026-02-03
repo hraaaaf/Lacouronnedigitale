@@ -9,27 +9,36 @@ const app = express();
 // Connexion à la base de données
 connectDB();
 
-// ========== CONFIGURATION CORS (CORRIGÉE POUR VERCEL) ==========
+// ===================================================
+// 🔧 CONFIGURATION CORS (SPÉCIAL VERCEL & RAILWAY)
+// ===================================================
 const corsOptions = {
-  // Met "true" pour accepter dynamiquement l'origine (Site officiel ET liens de preview Vercel)
-  origin: true, 
-  credentials: true, // Autorise les cookies/headers sécurisés
+  // 'origin: true' dit au navigateur : "J'accepte tout le monde" (Site officiel ET Previews)
+  // C'est la solution idéale pour débloquer tes erreurs actuelles.
+  origin: true,
+  credentials: true, // Autorise l'envoi de cookies/headers sécurisés
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 };
 
+// 1. Appliquer la config CORS
 app.use(cors(corsOptions));
 
-// Force la réponse OK pour les requêtes de pré-vérification (Preflight)
+// 2. Forcer explicitement la réponse OK pour les requêtes "Preflight" (OPTIONS)
+// C'est souvent ici que Vercel bloque si cette ligne manque.
 app.options('*', cors(corsOptions));
 
-// ========== AUTRES MIDDLEWARES ==========
+// ===================================================
+// 📦 MIDDLEWARES
+// ===================================================
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ========== ROUTES ==========
-// (On garde tes routes exactement comme avant)
+// ===================================================
+// 🛣️ ROUTES
+// ===================================================
+// Assure-toi que ces fichiers existent bien dans backend/routes/
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/produits', require('./routes/products'));
 app.use('/api/commandes', require('./routes/orders'));
@@ -37,16 +46,20 @@ app.use('/api/messages', require('./routes/messages'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/upload', require('./routes/upload'));
 
-// Servir les fichiers statiques
+// Servir les fichiers statiques (images uploadées)
 app.use('/uploads', express.static('uploads'));
 
-// Route de test (Racine)
+// ===================================================
+// 🏥 ROUTES DE DIAGNOSTIC
+// ===================================================
+
+// Route racine : Pour vérifier que le serveur est vivant
 app.get('/', (req, res) => {
   res.json({
     message: '🦷 API Dental Marketplace v1.0 En Ligne',
     status: 'actif',
     timestamp: new Date().toISOString(),
-    cors_mode: 'unrestricted', // Pour confirmer que le correctif est passé
+    cors_mode: 'unrestricted (origin: true)', // Preuve que le fix est appliqué
     endpoints: {
       auth: '/api/auth',
       produits: '/api/produits'
@@ -54,21 +67,25 @@ app.get('/', (req, res) => {
   });
 });
 
-// Route de santé pour Railway
+// Route Health : Utilisée par Railway pour savoir si tout va bien
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Gestion des erreurs 404
+// ===================================================
+// 🚨 GESTION DES ERREURS
+// ===================================================
+
+// 404 - Route introuvable
 app.use((req, res) => {
   res.status(404).json({
     succes: false,
-    message: 'Route introuvable.',
+    message: 'Route introuvable. Vérifiez l\'URL.',
     path: req.path
   });
 });
 
-// Gestion des erreurs globales
+// 500 - Erreur serveur globale
 app.use((err, req, res, next) => {
   console.error('❌ Erreur serveur:', err);
   res.status(500).json({
@@ -78,7 +95,9 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Démarrer le serveur
+// ===================================================
+// 🚀 DÉMARRAGE
+// ===================================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
