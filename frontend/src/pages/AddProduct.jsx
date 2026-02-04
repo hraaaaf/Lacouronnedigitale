@@ -73,23 +73,21 @@ const AddProduct = () => {
     setError('');
 
     try {
-      // CRUCIAL : On crée un objet FormData
       const data = new FormData();
       
-      // Ajout des champs simples
+      // --- CORRECTIF ICI ---
+      // On envoie des champs simples pour que multer et le backend les lisent facilement
       data.append('nom', formData.nom);
       data.append('description', formData.description);
       data.append('prix', formData.prix);
       data.append('categorie', formData.categorie);
       data.append('marque', formData.marque);
       data.append('conditionnement', formData.conditionnement);
+      
+      // IMPORTANT : On envoie 'stock' comme un simple nombre (string)
+      // Le backend fera : parseInt(req.body.stock)
+      data.append('stock', formData.stock);
 
-      // Adaptation pour le schéma stock: { quantite, unite }
-      // Ces clés permettent à Multer/Express de reconstruire l'objet si nécessaire
-      data.append('stock[quantite]', formData.stock);
-      data.append('stock[unite]', 'unité'); 
-
-      // Ajout des images (fichiers File bruts)
       if (images.length === 0) {
         throw new Error("Veuillez ajouter au moins une image.");
       }
@@ -98,13 +96,14 @@ const AddProduct = () => {
         data.append('images', imageFile);
       });
 
-      // Appel à l'API avec l'objet FormData
       await produitsAPI.create(data);
       
       navigate('/mes-produits');
     } catch (err) {
       console.error("Erreur complète:", err);
-      setError(err.response?.data?.message || err.message || "Erreur lors de la création");
+      // Afficher le message précis renvoyé par le serveur s'il existe
+      const serverMessage = err.response?.data?.message || err.response?.data?.error;
+      setError(serverMessage || err.message || "Erreur lors de la création");
     } finally {
       setLoading(false);
     }
@@ -128,7 +127,7 @@ const AddProduct = () => {
         </div>
 
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl flex items-center">
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl flex items-center animate-shake">
             <AlertCircle className="w-5 h-5 mr-2" />
             {error}
           </div>
@@ -137,6 +136,7 @@ const AddProduct = () => {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           <div className="lg:col-span-2 space-y-6">
+            {/* Infos Générales */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <div className="flex items-center space-x-3 mb-6 border-b border-gray-50 pb-4">
                 <FileText className="w-6 h-6 text-primary-600" />
@@ -202,6 +202,7 @@ const AddProduct = () => {
               </div>
             </div>
 
+            {/* Prix & Stock */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <div className="flex items-center space-x-3 mb-6 border-b border-gray-50 pb-4">
                 <DollarSign className="w-6 h-6 text-green-600" />
@@ -210,7 +211,7 @@ const AddProduct = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Prix (MAD)</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Prix (MAD) *</label>
                   <input
                     type="number"
                     name="prix"
@@ -218,10 +219,11 @@ const AddProduct = () => {
                     onChange={handleChange}
                     required
                     className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4"
+                    placeholder="0.00"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Stock</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Stock *</label>
                   <input
                     type="number"
                     name="stock"
@@ -229,6 +231,7 @@ const AddProduct = () => {
                     onChange={handleChange}
                     required
                     className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4"
+                    placeholder="Quantité"
                   />
                 </div>
                 <div>
