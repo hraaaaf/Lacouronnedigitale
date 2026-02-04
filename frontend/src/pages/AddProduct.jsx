@@ -68,45 +68,36 @@ const AddProduct = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+      e.preventDefault();
+      setLoading(true);
 
-    try {
-      const data = new FormData();
-      
-      // --- CORRECTIF ICI ---
-      // On envoie des champs simples pour que multer et le backend les lisent facilement
-      data.append('nom', formData.nom);
-      data.append('description', formData.description);
-      data.append('prix', formData.prix);
-      data.append('categorie', formData.categorie);
-      data.append('marque', formData.marque);
-      data.append('conditionnement', formData.conditionnement);
-      
-      // IMPORTANT : On envoie 'stock' comme un simple nombre (string)
-      // Le backend fera : parseInt(req.body.stock)
-      data.append('stock', formData.stock);
+      try {
+        const data = new FormData();
+        
+        data.append('nom', formData.nom);
+        data.append('description', formData.description);
+        data.append('prix', formData.prix);
+        data.append('categorie', formData.categorie);
+        data.append('marque', formData.marque);
+        
+        // Envoie juste la valeur simple, le backend s'occupe du reste !
+        data.append('stock', formData.stock); 
+        data.append('conditionnement', formData.conditionnement);
 
-      if (images.length === 0) {
-        throw new Error("Veuillez ajouter au moins une image.");
+        images.forEach((file) => {
+          data.append('images', file);
+        });
+
+        await produitsAPI.create(data);
+        navigate('/mes-produits');
+        
+      } catch (err) {
+        // Pour voir la VRAIE erreur si ça plante encore
+        console.error("Erreur Backend:", err.response?.data);
+        setError(err.response?.data?.message || "Erreur de création");
+      } finally {
+        setLoading(false);
       }
-
-      images.forEach((imageFile) => {
-        data.append('images', imageFile);
-      });
-
-      await produitsAPI.create(data);
-      
-      navigate('/mes-produits');
-    } catch (err) {
-      console.error("Erreur complète:", err);
-      // Afficher le message précis renvoyé par le serveur s'il existe
-      const serverMessage = err.response?.data?.message || err.response?.data?.error;
-      setError(serverMessage || err.message || "Erreur lors de la création");
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
