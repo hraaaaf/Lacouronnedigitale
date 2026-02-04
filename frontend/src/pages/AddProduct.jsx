@@ -15,15 +15,12 @@ import {
   AlertCircle 
 } from 'lucide-react';
 
-const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
 const AddProduct = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
+  
   const [formData, setFormData] = useState({
     nom: '',
     description: '',
@@ -34,21 +31,14 @@ const AddProduct = () => {
     conditionnement: ''
   });
 
-  const [images, setImages] = useState([]); // File[]
+  const [images, setImages] = useState([]);
   const [previews, setPreviews] = useState([]);
 
   const categories = [
-    'Instruments',
-    'Consommables',
-    'Équipements lourds',
-    'Hygiène & Stérilisation',
-    'Radiologie',
-    'Prothèse',
-    'Implantologie',
-    'Orthodontie',
-    'Endodontie',
-    'Parodontologie',
-    'Autres'
+    'Instruments', 'Consommables', 'Équipements lourds',
+    'Hygiène & Stérilisation', 'Radiologie', 'Prothèse',
+    'Implantologie', 'Orthodontie', 'Endodontie',
+    'Parodontologie', 'Autres'
   ];
 
   const handleChange = (e) => {
@@ -58,43 +48,28 @@ const AddProduct = () => {
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
-
+    
     if (images.length + files.length > 5) {
       setError('Vous ne pouvez ajouter que 5 images maximum.');
       return;
     }
 
+    // On ajoute les fichiers bruts (File) pour le FormData
     setImages(prev => [...prev, ...files]);
+
+    // On crée les URLs temporaires pour l'affichage (Previsualisation)
     const newPreviews = files.map(file => URL.createObjectURL(file));
     setPreviews(prev => [...prev, ...newPreviews]);
     setError('');
   };
 
   const removeImage = (index) => {
+    // 1. Libérer la mémoire de l'URL de prévisualisation
     URL.revokeObjectURL(previews[index]);
+    
+    // 2. Mettre à jour les deux tableaux
     setImages(prev => prev.filter((_, i) => i !== index));
     setPreviews(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // UPLOAD CLOUDINARY (clé du fix)
-  const uploadToCloudinary = async (file) => {
-    const data = new FormData();
-    data.append('file', file);
-    data.append('upload_preset', UPLOAD_PRESET);
-
-    const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-      { method: 'POST', body: data }
-    );
-
-    if (!res.ok) throw new Error('Erreur upload image');
-
-    const result = await res.json();
-    return {
-      url: result.secure_url,
-      public_id: result.public_id,
-      altText: formData.nom || ''
-    };
   };
 
   const handleSubmit = async (e) => {
@@ -103,114 +78,209 @@ const AddProduct = () => {
     setError('');
 
     try {
-      if (images.length === 0) {
-        setError('Au moins une image est requise.');
-        setLoading(false);
-        return;
-      }
-
-      // 1️⃣ Upload images vers Cloudinary
-      const uploadedImages = await Promise.all(
-        images.map(img => uploadToCloudinary(img))
-      );
-
-      // 2️⃣ Envoi au backend (JSON, plus de FormData)
-      await produitsAPI.create({
-        ...formData,
-        prix: Number(formData.prix),
-        stock: Number(formData.stock),
-        images: uploadedImages
+      const data = new FormData();
+      
+      // Ajout des champs textes au FormData
+      Object.keys(formData).forEach(key => {
+        data.append(key, formData[key]);
       });
 
+      // Ajout des images (fichiers bruts) au FormData
+      // Note : On utilise la clé 'images' pour correspondre à upload.array('images', 5) au backend
+      images.forEach(image => {
+        data.append('images', image);
+      });
+
+      await produitsAPI.create(data);
       navigate('/mes-produits');
     } catch (err) {
       console.error(err);
-      setError(err.message || "Erreur lors de la création du produit");
+      setError(err.response?.data?.message || "Erreur lors de la création du produit");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-gray-50/50">
       <div className="max-w-5xl mx-auto">
-
+        
+        {/* En-tête */}
         <div className="flex items-center justify-between mb-8">
-          <Link to="/mes-produits" className="flex items-center text-slate-500 font-bold">
+          <Link 
+            to="/mes-produits" 
+            className="flex items-center text-slate-500 hover:text-primary-600 transition-colors font-bold"
+          >
             <ArrowLeft className="w-5 h-5 mr-2" />
             Retour à l'inventaire
           </Link>
-          <h1 className="text-3xl font-black">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
             Nouveau <span className="text-primary-600">Produit</span>
           </h1>
         </div>
 
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl flex items-center">
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl flex items-center animate-shake">
             <AlertCircle className="w-5 h-5 mr-2" />
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-          {/* COLONNE GAUCHE */}
+          
           <div className="lg:col-span-2 space-y-6">
+            {/* Carte Infos Générales */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+              <div className="flex items-center space-x-3 mb-6 border-b border-gray-50 pb-4">
+                <FileText className="w-6 h-6 text-primary-600" />
+                <h2 className="text-xl font-bold text-gray-900">Informations détaillées</h2>
+              </div>
 
-            <div className="card">
-              <h2 className="text-xl font-bold mb-4">Informations générales</h2>
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Nom du produit *</label>
+                  <input
+                    type="text"
+                    name="nom"
+                    value={formData.nom}
+                    onChange={handleChange}
+                    required
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all"
+                    placeholder="Ex: Turbine dentaire haute vitesse"
+                  />
+                </div>
 
-              <input name="nom" value={formData.nom} onChange={handleChange} required className="input-field" placeholder="Nom du produit" />
-              <textarea name="description" value={formData.description} onChange={handleChange} required rows="4" className="input-field mt-4" />
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Description *</label>
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    required
+                    rows="5"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all resize-none"
+                    placeholder="Spécifications techniques..."
+                  />
+                </div>
 
-              <select name="categorie" value={formData.categorie} onChange={handleChange} required className="input-field mt-4">
-                <option value="">Sélectionner...</option>
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Catégorie *</label>
+                    <select
+                      name="categorie"
+                      value={formData.categorie}
+                      onChange={handleChange}
+                      required
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary-500/20 outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="">Sélectionner...</option>
+                      {categories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
 
-              <input name="marque" value={formData.marque} onChange={handleChange} className="input-field mt-4" placeholder="Marque" />
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Marque</label>
+                    <input
+                      type="text"
+                      name="marque"
+                      value={formData.marque}
+                      onChange={handleChange}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4"
+                      placeholder="Ex: NSK"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="card">
-              <h2 className="text-xl font-bold mb-4">Prix & Stock</h2>
+            {/* Carte Prix & Stock */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+              <div className="flex items-center space-x-3 mb-6 border-b border-gray-50 pb-4">
+                <DollarSign className="w-6 h-6 text-green-600" />
+                <h2 className="text-xl font-bold text-gray-900">Prix & Inventaire</h2>
+              </div>
 
-              <input type="number" name="prix" value={formData.prix} onChange={handleChange} required className="input-field" placeholder="Prix" />
-              <input type="number" name="stock" value={formData.stock} onChange={handleChange} required className="input-field mt-4" placeholder="Stock" />
-              <input name="conditionnement" value={formData.conditionnement} onChange={handleChange} className="input-field mt-4" placeholder="Conditionnement" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Prix (MAD)</label>
+                  <input
+                    type="number"
+                    name="prix"
+                    value={formData.prix}
+                    onChange={handleChange}
+                    required
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Stock</label>
+                  <input
+                    type="number"
+                    name="stock"
+                    value={formData.stock}
+                    onChange={handleChange}
+                    required
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Unité</label>
+                  <input
+                    type="text"
+                    name="conditionnement"
+                    value={formData.conditionnement}
+                    onChange={handleChange}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4"
+                    placeholder="Ex: Boîte de 50"
+                  />
+                </div>
+              </div>
             </div>
-
           </div>
 
-          {/* COLONNE DROITE */}
+          {/* COLONNE DROITE : Images */}
           <div className="space-y-6">
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Photos du produit</h2>
+              
+              <div className="space-y-4">
+                <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-primary-200 rounded-2xl cursor-pointer bg-primary-50/30 hover:bg-primary-50 transition-colors group">
+                  <div className="flex flex-col items-center justify-center">
+                    <Upload className="w-8 h-8 text-primary-500 mb-2 group-hover:scale-110 transition-transform" />
+                    <p className="text-sm font-bold text-gray-600">Ajouter des photos</p>
+                  </div>
+                  <input type="file" className="hidden" onChange={handleImageChange} multiple accept="image/*" />
+                </label>
 
-            <div className="card">
-              <h2 className="text-lg font-bold mb-2">Images</h2>
-
-              <label className="block border-2 border-dashed rounded-xl p-6 text-center cursor-pointer">
-                <Upload className="mx-auto mb-2" />
-                <input type="file" className="hidden" multiple accept="image/*" onChange={handleImageChange} />
-                Ajouter des images
-              </label>
-
-              {previews.length > 0 && (
-                <div className="grid grid-cols-2 gap-2 mt-4">
-                  {previews.map((src, i) => (
-                    <div key={i} className="relative">
-                      <img src={src} className="rounded-lg object-cover h-32 w-full" />
-                      <button type="button" onClick={() => removeImage(i)} className="absolute top-1 right-1 bg-white rounded-full p-1">
+                {/* Grille de prévisualisation */}
+                <div className="grid grid-cols-2 gap-3">
+                  {previews.map((src, index) => (
+                    <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-gray-100 group">
+                      <img src={src} className="w-full h-full object-cover" alt="Preview" />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute top-1 right-1 p-1 bg-white/90 text-red-500 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
                   ))}
                 </div>
-              )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-primary-600 text-white rounded-2xl py-4 font-bold shadow-lg shadow-primary-500/30 hover:bg-primary-700 hover:-translate-y-1 transition-all disabled:bg-gray-300 disabled:translate-y-0"
+                >
+                  {loading ? 'Publication en cours...' : 'Publier le produit'}
+                </button>
+              </div>
             </div>
-
-            <button type="submit" disabled={loading} className="btn-primary w-full py-4">
-              {loading ? 'Publication…' : 'Publier le produit'}
-            </button>
-
           </div>
         </form>
       </div>

@@ -1,13 +1,9 @@
-// upload.js
-// Version production-friendly : stockage en mémoire (pour upload via backend si besoin).
-// Si tu fais Cloudinary-only depuis le front, ce fichier peut être ignoré.
 const multer = require('multer');
 const path = require('path');
 
-// Mémoire (pas d'écriture disque)
+// Stockage en mémoire vive (Buffer) pour envoi direct à Cloudinary
 const storage = multer.memoryStorage();
 
-// Filtrer les types de fichiers (images)
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|webp/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -22,7 +18,7 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 }, // Limite 5MB
   fileFilter
 });
 
