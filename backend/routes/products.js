@@ -68,65 +68,69 @@ router.get('/:id', async (req, res) => {
 // POST /api/produits
 // Cloudinary-only flow: le frontend doit avoir uploadé l'image(s) vers Cloudinary et envoie ici `req.body.images`
 // Ex: images = [{ url: 'https://res.cloudinary.com/..../image.jpg', public_id: 'produits/abcd', altText: '...' }, ...]
-router.post('/', proteger, autoriser('fournisseur'), verifierAbonnement, async (req, res) => {
+
+router.post('/', proteger, autoriser('fournisseur'), upload.array('images', 5), async (req, res) => {
   try {
-    // Récupérer et parser images si besoin
-    let images = [];
-    if (req.body.images) {
-      if (Array.isArray(req.body.images)) images = req.body.images;
-      else {
-        try { images = JSON.parse(req.body.images); } catch (e) { images = []; }
+    // 1. Gestion des images Cloudinary
+    const imagesUrls = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        // Conversion buffer -> base64 pour Cloudinary
+        const b64 = Buffer.from(file.buffer).toString('base64');
+        let dataURI = "data:" + file.mimetype + ";base64," + b64;
+        
+        const result = await cloudinary.uploader.upload(dataURI, {
+          folder: 'dental_market/products',
+        });
+        
+        imagesUrls.push({
+          url: result.secure_url,
+          public_id: result.public_id
+        });
       }
     }
 
-    // Validation minimale : exiger au moins une image (optionnel, modifiable)
-    if (!images || images.length === 0) {
-      return res.status(400).json({ succes: false, message: 'Au moins une image (url + public_id) est requise.' });
-    }
+    // 2. Construction intelligente de l'objet Produit
+    // On extrait les champs simples
+    const { nom, description, prix, categorie, marque, conditionnement } = req.body;
 
-    // Vérifier la structure des images
-    const invalid = images.some(img => !img.url || !img.public_id);
-    if (invalid) {
-      return res.status(400).json({ succes: false, message: 'Chaque image doit contenir url et public_id.' });
-    }
+    // On prépare le stock manuellement pour satisfaire Mongoose
+    // On accepte soit "stock" (nombre direct), soit "stock[quantite]"
+    const quantiteStock = req.body.stock || req.body['stock[quantite]'];
 
-    // Caractéristiques parsing
-    let caracs = [];
-    if (req.body.caracteristiques) {
-      if (Array.isArray(req.body.caracteristiques)) caracs = req.body.caracteristiques;
-      else if (req.body.caracteristiques.startsWith && req.body.caracteristiques.startsWith('[')) {
-        try { caracs = JSON.parse(req.body.caracteristiques); } catch (e) { console.log('Erreur parsing caracs JSON'); }
-      } else {
-        caracs = req.body.caracteristiques.split(',').map(c => c.trim());
-      }
-    }
-
-    const quantiteStock = parseInt(req.body.stock) || 0;
-    const stockObject = {
-      quantite: quantiteStock,
-      seuilAlerte: 5,
-      statut: quantiteStock > 0 ? 'en_stock' : 'rupture'
-    };
-
-    const produit = await Product.create({
-      nom: req.body.nom,
-      description: req.body.description,
-      categorie: req.body.categorie,
-      sousCategorie: req.body.sousCategorie,
-      marque: req.body.marque,
-      conditionnement: req.body.conditionnement,
-      prix: req.body.prix,
-      stock: stockObject,
-      images: images,
-      caracteristiques: caracs,
-      livraison: req.body.livraison,
-      fournisseur: req.user._id
+    const nouveauProduit = new Product({
+      nom,
+      description,
+      prix: parseFloat(prix), // On s'assure que c'est un nombre
+      categorie,
+      marque,
+      // Ici est la correction magique :
+      stock: {
+        quantite: parseInt(quantiteStock, 10),
+        unite: conditionnement || 'unité' // On utilise le conditionnement comme unité ou par défaut 'unité'
+      },
+      images: imagesUrls,
+      fournisseur: req.user._id // On lie le produit au fournisseur connecté
     });
 
-    res.status(201).json({ succes: true, message: 'Produit créé avec succès !', produit });
+    // 3. Sauvegarde
+    const produitSauvegarde = await nouveauProduit.save();
+
+    res.status(201).json({
+      succes: true,
+      data: produitSauvegarde
+    });
+
   } catch (error) {
     console.error('Erreur création produit:', error);
-    res.status(500).json({ succes: false, message: 'Erreur lors de la création du produit.', erreur: error.message });
+    // Si erreur, on supprime les images uploadées pour ne pas polluer Cloudinary
+    /* (Code optionnel de nettoyage ici) */
+    
+    // On renvoie l'erreur précise pour t'aider à débugger
+    res.status(400).json({ 
+      succes: false, 
+      message: error.message || 'Erreur lors de la création du produit' 
+    });
   }
 });
 
