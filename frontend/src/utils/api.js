@@ -47,10 +47,9 @@ export const authAPI = {
 export const produitsAPI = {
   getAll: (params) => api.get('/produits', { params }),
   getById: (id) => api.get(`/produits/${id}`),
-  create: (data) => api.post('/produits', data, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  update: (id, data) => api.put(`/produits/${id}`, data),
+  // On laisse Axios gérer le Content-Type automatiquement pour le FormData
+  create: (formData) => api.post('/produits', formData),
+  update: (id, formData) => api.put(`/produits/${id}`, formData),
   delete: (id) => api.delete(`/produits/${id}`),
   getMesProduits: () => api.get('/produits/fournisseur/mes-produits'),
 };
@@ -88,12 +87,8 @@ export const usersAPI = {
 
 // ============ UPLOAD ============
 export const uploadAPI = {
-  uploadImage: (formData) => api.post('/upload/image', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  uploadImages: (formData) => api.post('/upload/images', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
+  uploadImage: (formData) => api.post('/upload/image', formData),
+  uploadImages: (formData) => api.post('/upload/images', formData),
 };
 
 export default api;

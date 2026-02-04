@@ -54,20 +54,15 @@ const AddProduct = () => {
       return;
     }
 
-    // On ajoute les fichiers bruts (File) pour le FormData
     setImages(prev => [...prev, ...files]);
 
-    // On crée les URLs temporaires pour l'affichage (Previsualisation)
     const newPreviews = files.map(file => URL.createObjectURL(file));
     setPreviews(prev => [...prev, ...newPreviews]);
     setError('');
   };
 
   const removeImage = (index) => {
-    // 1. Libérer la mémoire de l'URL de prévisualisation
     URL.revokeObjectURL(previews[index]);
-    
-    // 2. Mettre à jour les deux tableaux
     setImages(prev => prev.filter((_, i) => i !== index));
     setPreviews(prev => prev.filter((_, i) => i !== index));
   };
@@ -78,24 +73,38 @@ const AddProduct = () => {
     setError('');
 
     try {
+      // CRUCIAL : On crée un objet FormData
       const data = new FormData();
       
-      // Ajout des champs textes au FormData
-      Object.keys(formData).forEach(key => {
-        data.append(key, formData[key]);
+      // Ajout des champs simples
+      data.append('nom', formData.nom);
+      data.append('description', formData.description);
+      data.append('prix', formData.prix);
+      data.append('categorie', formData.categorie);
+      data.append('marque', formData.marque);
+      data.append('conditionnement', formData.conditionnement);
+
+      // Adaptation pour le schéma stock: { quantite, unite }
+      // Ces clés permettent à Multer/Express de reconstruire l'objet si nécessaire
+      data.append('stock[quantite]', formData.stock);
+      data.append('stock[unite]', 'unité'); 
+
+      // Ajout des images (fichiers File bruts)
+      if (images.length === 0) {
+        throw new Error("Veuillez ajouter au moins une image.");
+      }
+
+      images.forEach((imageFile) => {
+        data.append('images', imageFile);
       });
 
-      // Ajout des images (fichiers bruts) au FormData
-      // Note : On utilise la clé 'images' pour correspondre à upload.array('images', 5) au backend
-      images.forEach(image => {
-        data.append('images', image);
-      });
-
+      // Appel à l'API avec l'objet FormData
       await produitsAPI.create(data);
+      
       navigate('/mes-produits');
     } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.message || "Erreur lors de la création du produit");
+      console.error("Erreur complète:", err);
+      setError(err.response?.data?.message || err.message || "Erreur lors de la création");
     } finally {
       setLoading(false);
     }
@@ -105,7 +114,6 @@ const AddProduct = () => {
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-gray-50/50">
       <div className="max-w-5xl mx-auto">
         
-        {/* En-tête */}
         <div className="flex items-center justify-between mb-8">
           <Link 
             to="/mes-produits" 
@@ -120,7 +128,7 @@ const AddProduct = () => {
         </div>
 
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl flex items-center animate-shake">
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl flex items-center">
             <AlertCircle className="w-5 h-5 mr-2" />
             {error}
           </div>
@@ -129,7 +137,6 @@ const AddProduct = () => {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           <div className="lg:col-span-2 space-y-6">
-            {/* Carte Infos Générales */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <div className="flex items-center space-x-3 mb-6 border-b border-gray-50 pb-4">
                 <FileText className="w-6 h-6 text-primary-600" />
@@ -146,7 +153,7 @@ const AddProduct = () => {
                     onChange={handleChange}
                     required
                     className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all"
-                    placeholder="Ex: Turbine dentaire haute vitesse"
+                    placeholder="Ex: Turbine dentaire"
                   />
                 </div>
 
@@ -159,7 +166,7 @@ const AddProduct = () => {
                     required
                     rows="5"
                     className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all resize-none"
-                    placeholder="Spécifications techniques..."
+                    placeholder="Spécifications..."
                   />
                 </div>
 
@@ -171,7 +178,7 @@ const AddProduct = () => {
                       value={formData.categorie}
                       onChange={handleChange}
                       required
-                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary-500/20 outline-none appearance-none cursor-pointer"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 outline-none appearance-none cursor-pointer"
                     >
                       <option value="">Sélectionner...</option>
                       {categories.map((cat) => (
@@ -195,7 +202,6 @@ const AddProduct = () => {
               </div>
             </div>
 
-            {/* Carte Prix & Stock */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <div className="flex items-center space-x-3 mb-6 border-b border-gray-50 pb-4">
                 <DollarSign className="w-6 h-6 text-green-600" />
@@ -212,7 +218,6 @@ const AddProduct = () => {
                     onChange={handleChange}
                     required
                     className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4"
-                    placeholder="0.00"
                   />
                 </div>
                 <div>
@@ -224,11 +229,10 @@ const AddProduct = () => {
                     onChange={handleChange}
                     required
                     className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4"
-                    placeholder="0"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Unité</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Conditionnement</label>
                   <input
                     type="text"
                     name="conditionnement"
@@ -242,21 +246,17 @@ const AddProduct = () => {
             </div>
           </div>
 
-          {/* COLONNE DROITE : Images */}
           <div className="space-y-6">
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Photos du produit</h2>
               
               <div className="space-y-4">
                 <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-primary-200 rounded-2xl cursor-pointer bg-primary-50/30 hover:bg-primary-50 transition-colors group">
-                  <div className="flex flex-col items-center justify-center">
-                    <Upload className="w-8 h-8 text-primary-500 mb-2 group-hover:scale-110 transition-transform" />
-                    <p className="text-sm font-bold text-gray-600">Ajouter des photos</p>
-                  </div>
+                  <Upload className="w-8 h-8 text-primary-500 mb-2 group-hover:scale-110 transition-transform" />
+                  <p className="text-sm font-bold text-gray-600">Ajouter des photos</p>
                   <input type="file" className="hidden" onChange={handleImageChange} multiple accept="image/*" />
                 </label>
 
-                {/* Grille de prévisualisation */}
                 <div className="grid grid-cols-2 gap-3">
                   {previews.map((src, index) => (
                     <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-gray-100 group">
@@ -264,7 +264,7 @@ const AddProduct = () => {
                       <button
                         type="button"
                         onClick={() => removeImage(index)}
-                        className="absolute top-1 right-1 p-1 bg-white/90 text-red-500 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-1 right-1 p-1 bg-white/90 text-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -275,9 +275,9 @@ const AddProduct = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-primary-600 text-white rounded-2xl py-4 font-bold shadow-lg shadow-primary-500/30 hover:bg-primary-700 hover:-translate-y-1 transition-all disabled:bg-gray-300 disabled:translate-y-0"
+                  className="w-full bg-primary-600 text-white rounded-2xl py-4 font-bold shadow-lg hover:bg-primary-700 transition-all disabled:bg-gray-300"
                 >
-                  {loading ? 'Publication en cours...' : 'Publier le produit'}
+                  {loading ? 'Publication...' : 'Publier le produit'}
                 </button>
               </div>
             </div>
