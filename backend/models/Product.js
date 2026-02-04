@@ -1,7 +1,13 @@
+// models/Product.js
 const mongoose = require('mongoose');
 
+const imageSchema = new mongoose.Schema({
+  url: { type: String, required: true },
+  public_id: { type: String, required: true },
+  altText: { type: String, default: '' }
+}, { _id: false });
+
 const productSchema = new mongoose.Schema({
-  // Informations de base
   nom: {
     type: String,
     required: [true, 'Le nom du produit est requis'],
@@ -13,8 +19,6 @@ const productSchema = new mongoose.Schema({
     required: [true, 'La description est requise'],
     maxlength: [2000, 'Maximum 2000 caractères']
   },
-  
-  // Catégorisation
   categorie: {
     type: String,
     required: [true, 'La catégorie est requise'],
@@ -34,8 +38,6 @@ const productSchema = new mongoose.Schema({
   },
   sousCategorie: String,
   marque: String,
-  
-  // Prix et stock
   prix: {
     type: Number,
     required: [true, 'Le prix est requis'],
@@ -57,81 +59,49 @@ const productSchema = new mongoose.Schema({
       enum: ['unité', 'boîte', 'paquet', 'set', 'kg', 'litre']
     }
   },
-  
-  // Images
-  images: [{
-    url: String,
-    altText: String
-  }],
-  
-  // Fournisseur
+  images: {
+    type: [imageSchema],
+    default: []
+  },
   fournisseur: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  
-  // Spécifications techniques
   specifications: {
     reference: String,
     dimensions: String,
     poids: String,
     materiau: String,
-    certification: String, // Ex: CE, FDA
+    certification: String,
     origine: String
   },
-  
-  // Livraison
   livraison: {
     type: {
       type: String,
       enum: ['standard', 'express', 'equipement_lourd', 'sur_devis'],
       default: 'standard'
     },
-    delai: String, // Ex: "2-5 jours"
+    delai: String,
     frais: Number,
-    zones: [String] // Villes disponibles
+    zones: [String]
   },
-  
-  // Évaluations
   evaluations: {
-    note: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 5
-    },
-    nombreAvis: {
-      type: Number,
-      default: 0
-    }
+    note: { type: Number, default: 0, min: 0, max: 5 },
+    nombreAvis: { type: Number, default: 0 }
   },
-  
-  // Statut
-  actif: {
-    type: Boolean,
-    default: true
-  },
+  actif: { type: Boolean, default: true },
   enPromo: {
     actif: Boolean,
     prixPromo: Number,
     dateFin: Date
   },
-  
-  // Métadonnées
-  vues: {
-    type: Number,
-    default: 0
-  },
-  ventesTotales: {
-    type: Number,
-    default: 0
-  }
+  vues: { type: Number, default: 0 },
+  ventesTotales: { type: Number, default: 0 }
 }, {
   timestamps: true
 });
 
-// Index pour recherche rapide
 productSchema.index({ nom: 'text', description: 'text', marque: 'text' });
 productSchema.index({ categorie: 1, prix: 1 });
 productSchema.index({ fournisseur: 1 });

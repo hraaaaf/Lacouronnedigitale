@@ -1,19 +1,13 @@
+// upload.js
+// Version production-friendly : stockage en mémoire (pour upload via backend si besoin).
+// Si tu fais Cloudinary-only depuis le front, ce fichier peut être ignoré.
 const multer = require('multer');
 const path = require('path');
 
-// Configuration du stockage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/'); // Dossier où seront stockées les images
-  },
-  filename: function (req, file, cb) {
-    // Générer un nom unique : timestamp + nom original
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+// Mémoire (pas d'écriture disque)
+const storage = multer.memoryStorage();
 
-// Filtrer les types de fichiers (seulement images)
+// Filtrer les types de fichiers (images)
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|webp/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -26,13 +20,10 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Configuration de multer
 const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // Limite: 5MB par image
-  },
-  fileFilter: fileFilter
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter
 });
 
 module.exports = upload;

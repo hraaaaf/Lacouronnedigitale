@@ -1,45 +1,32 @@
+// routes/products.js
 const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
-const upload = require('../middleware/upload'); // Assure-toi que ce fichier existe bien
 const { proteger, autoriser, verifierAbonnement } = require('../middleware/auth');
-const cloudinary = require('cloudinary').v2; 
+const cloudinary = require('cloudinary').v2;
 
-// @route   GET /api/produits
-// @desc    Récupérer tous les produits (avec filtres, pagination, recherche)
-// @access  Public
+// IMPORTANT : Cloudinary doit être configuré ailleurs (process.env.CLOUDINARY_URL ou cloudinary.config)
+
+
+// GET /api/produits
 router.get('/', async (req, res) => {
   try {
     const { categorie, ville, prixMin, prixMax, recherche, page = 1, limite = 20 } = req.query;
-
-    // Construire le filtre
     let filtre = { actif: true };
-
     if (categorie) filtre.categorie = categorie;
-    
-    // Filtre Prix
     if (prixMin || prixMax) {
       filtre.prix = {};
       if (prixMin) filtre.prix.$gte = parseFloat(prixMin);
       if (prixMax) filtre.prix.$lte = parseFloat(prixMax);
     }
-
-    // Filtre Recherche Textuelle
-    if (recherche) {
-      filtre.$text = { $search: recherche };
-    }
-
-    // Pagination
+    if (recherche) filtre.$text = { $search: recherche };
     const skip = (page - 1) * limite;
-
     const produits = await Product.find(filtre)
       .populate('fournisseur', 'nom prenom entreprise ville')
       .limit(parseInt(limite))
       .skip(skip)
       .sort({ createdAt: -1 });
-
     const total = await Product.countDocuments(filtre);
-
     res.status(200).json({
       succes: true,
       count: produits.length,
@@ -50,243 +37,156 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Erreur récupération produits:', error);
-    res.status(500).json({
-      succes: false,
-      message: 'Erreur lors de la récupération des produits.'
-    });
+    res.status(500).json({ succes: false, message: 'Erreur lors de la récupération des produits.' });
   }
 });
 
-// @route   GET /api/produits/fournisseur/mes-produits
-// @desc    Récupérer les produits du fournisseur connecté
-// @access  Privé (fournisseur)
-// NOTE : Placée AVANT /:id pour éviter les conflits de routes
+// GET /api/produits/fournisseur/mes-produits
 router.get('/fournisseur/mes-produits', proteger, autoriser('fournisseur'), async (req, res) => {
   try {
-    const produits = await Product.find({ fournisseur: req.user._id })
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({
-      succes: true,
-      count: produits.length,
-      produits
-    });
+    const produits = await Product.find({ fournisseur: req.user._id }).sort({ createdAt: -1 });
+    res.status(200).json({ succes: true, count: produits.length, produits });
   } catch (error) {
-    res.status(500).json({
-      succes: false,
-      message: 'Erreur lors de la récupération des produits.'
-    });
+    res.status(500).json({ succes: false, message: 'Erreur lors de la récupération des produits.' });
   }
 });
 
-// @route   GET /api/produits/:id
-// @desc    Récupérer un produit par ID
-// @access  Public
+// GET /api/produits/:id
 router.get('/:id', async (req, res) => {
   try {
-    const produit = await Product.findById(req.params.id)
-      .populate('fournisseur', 'nom prenom entreprise telephone email stats');
-
-    if (!produit) {
-      return res.status(404).json({
-        succes: false,
-        message: 'Produit introuvable.'
-      });
-    }
-
-    // Incrémenter le nombre de vues
+    const produit = await Product.findById(req.params.id).populate('fournisseur', 'nom prenom entreprise telephone email stats');
+    if (!produit) return res.status(404).json({ succes: false, message: 'Produit introuvable.' });
     produit.vues += 1;
     await produit.save();
-
-    res.status(200).json({
-      succes: true,
-      produit
-    });
+    res.status(200).json({ succes: true, produit });
   } catch (error) {
-    res.status(500).json({
-      succes: false,
-      message: 'Erreur lors de la récupération du produit ou ID invalide.'
-    });
+    console.error('Erreur récupération produit:', error);
+    res.status(500).json({ succes: false, message: 'Erreur lors de la récupération du produit ou ID invalide.' });
   }
 });
 
-// @route   POST /api/produits
-// @desc    Créer un nouveau produit (avec images et stock corrigé)
-// @access  Privé (fournisseur avec abonnement actif)
-router.post('/', proteger, autoriser('fournisseur'), verifierAbonnement, upload.array('images', 5), async (req, res) => {
+// POST /api/produits
+// Cloudinary-only flow: le frontend doit avoir uploadé l'image(s) vers Cloudinary et envoie ici `req.body.images`
+// Ex: images = [{ url: 'https://res.cloudinary.com/..../image.jpg', public_id: 'produits/abcd', altText: '...' }, ...]
+router.post('/', proteger, autoriser('fournisseur'), verifierAbonnement, async (req, res) => {
   try {
-    // 1. Gestion des Images (Multer)
-    
-    let imagesUrls = [];
-    if (req.files && req.files.length > 0) {
-    try {
-      // Upload vers Cloudinary
-      const uploadPromises = req.files.map(file => 
-        cloudinary.uploader.upload(file.path, {
-          folder: 'produits',
-          resource_type: 'image',
-          transformation: [
-            { width: 800, height: 800, crop: 'limit' },
-            { quality: 'auto:good' }
-          ]
-        })
-      );
-      
-      const results = await Promise.all(uploadPromises);
-      
-      imagesUrls = results.map(result => ({
-        url: result.secure_url,  // URL publique permanente
-        public_id: result.public_id,
-        altText: req.body.nom || ''
-      }));
-      
-      // Supprimer les fichiers temporaires
-      req.files.forEach(file => {
-        require('fs').unlinkSync(file.path);
-      });
-      
-    } catch (uploadError) {
-      console.error('Erreur upload Cloudinary:', uploadError);
-      // Supprimer les fichiers temporaires en cas d'erreur
-      req.files.forEach(file => {
-        require('fs').unlinkSync(file.path).catch(() => {});
-      });
-      throw uploadError;
-    }
+    // Récupérer et parser images si besoin
+    let images = [];
+    if (req.body.images) {
+      if (Array.isArray(req.body.images)) images = req.body.images;
+      else {
+        try { images = JSON.parse(req.body.images); } catch (e) { images = []; }
+      }
     }
 
-    // 2. Gestion des caractéristiques (Parsing JSON ou Array)
+    // Validation minimale : exiger au moins une image (optionnel, modifiable)
+    if (!images || images.length === 0) {
+      return res.status(400).json({ succes: false, message: 'Au moins une image (url + public_id) est requise.' });
+    }
+
+    // Vérifier la structure des images
+    const invalid = images.some(img => !img.url || !img.public_id);
+    if (invalid) {
+      return res.status(400).json({ succes: false, message: 'Chaque image doit contenir url et public_id.' });
+    }
+
+    // Caractéristiques parsing
     let caracs = [];
     if (req.body.caracteristiques) {
-      // Si c'est déjà un tableau, on le garde, sinon on essaie de le parser ou split
-      if (Array.isArray(req.body.caracteristiques)) {
-        caracs = req.body.caracteristiques;
-      } else if (req.body.caracteristiques.startsWith('[')) {
-        try {
-            caracs = JSON.parse(req.body.caracteristiques);
-        } catch (e) { console.log('Erreur parsing caracs JSON'); }
+      if (Array.isArray(req.body.caracteristiques)) caracs = req.body.caracteristiques;
+      else if (req.body.caracteristiques.startsWith && req.body.caracteristiques.startsWith('[')) {
+        try { caracs = JSON.parse(req.body.caracteristiques); } catch (e) { console.log('Erreur parsing caracs JSON'); }
       } else {
         caracs = req.body.caracteristiques.split(',').map(c => c.trim());
       }
     }
 
-    // 3. Gestion du Stock (CORRECTION MAJEURE)
-    // On convertit la valeur "stock" simple du formulaire en objet { quantite: X, ... }
     const quantiteStock = parseInt(req.body.stock) || 0;
     const stockObject = {
-        quantite: quantiteStock,
-        seuilAlerte: 5,
-        statut: quantiteStock > 0 ? 'en_stock' : 'rupture'
+      quantite: quantiteStock,
+      seuilAlerte: 5,
+      statut: quantiteStock > 0 ? 'en_stock' : 'rupture'
     };
 
-    // 4. Création
     const produit = await Product.create({
       nom: req.body.nom,
       description: req.body.description,
       categorie: req.body.categorie,
-      sousCategorie: req.body.sousCategorie, // Optionnel
+      sousCategorie: req.body.sousCategorie,
       marque: req.body.marque,
       conditionnement: req.body.conditionnement,
       prix: req.body.prix,
-      stock: stockObject, // On passe l'objet corrigé
-      images: imagesUrls,
+      stock: stockObject,
+      images: images,
       caracteristiques: caracs,
-      livraison: req.body.livraison, // Si envoyé par le front
+      livraison: req.body.livraison,
       fournisseur: req.user._id
     });
 
-    res.status(201).json({
-      succes: true,
-      message: 'Produit créé avec succès !',
-      produit
-    });
-
+    res.status(201).json({ succes: true, message: 'Produit créé avec succès !', produit });
   } catch (error) {
     console.error('Erreur création produit:', error);
-    res.status(500).json({
-      succes: false,
-      message: 'Erreur lors de la création du produit.',
-      erreur: error.message
-    });
+    res.status(500).json({ succes: false, message: 'Erreur lors de la création du produit.', erreur: error.message });
   }
 });
 
-// @route   PUT /api/produits/:id
-// @desc    Modifier un produit
-// @access  Privé (fournisseur propriétaire uniquement)
+// PUT /api/produits/:id
 router.put('/:id', proteger, autoriser('fournisseur'), verifierAbonnement, async (req, res) => {
   try {
     let produit = await Product.findById(req.params.id);
-
-    if (!produit) {
-      return res.status(404).json({
-        succes: false,
-        message: 'Produit introuvable.'
-      });
-    }
-
-    // Vérifier que l'utilisateur est le propriétaire
+    if (!produit) return res.status(404).json({ succes: false, message: 'Produit introuvable.' });
     if (produit.fournisseur.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        succes: false,
-        message: 'Vous n\'êtes pas autorisé à modifier ce produit.'
-      });
+      return res.status(403).json({ succes: false, message: 'Vous n\'êtes pas autorisé à modifier ce produit.' });
     }
 
-    // NOTE: Si tu veux gérer l'update des images ici plus tard, il faudra ajouter upload.array() 
-    // et la logique de suppression des anciennes images. Pour l'instant, on garde la logique texte.
+    // Si le frontend envoie `images` (mise à jour), on accepte la nouvelle valeur (expects url+public_id)
+    if (req.body.images) {
+      let images = Array.isArray(req.body.images) ? req.body.images : (() => {
+        try { return JSON.parse(req.body.images); } catch { return []; }
+      })();
+      if (images.length > 0) req.body.images = images;
+      else delete req.body.images;
+    }
 
-    produit = await Product.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true
-    });
+    produit = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
 
-    res.status(200).json({
-      succes: true,
-      message: 'Produit modifié avec succès !',
-      produit
-    });
+    res.status(200).json({ succes: true, message: 'Produit modifié avec succès !', produit });
   } catch (error) {
-    res.status(500).json({
-      succes: false,
-      message: 'Erreur lors de la modification du produit.'
-    });
+    console.error('Erreur modification produit:', error);
+    res.status(500).json({ succes: false, message: 'Erreur lors de la modification du produit.' });
   }
 });
 
-// @route   DELETE /api/produits/:id
-// @desc    Supprimer un produit
-// @access  Privé (fournisseur propriétaire uniquement)
+// DELETE /api/produits/:id
+// Supprime aussi les images côté Cloudinary si public_id présent
 router.delete('/:id', proteger, autoriser('fournisseur'), async (req, res) => {
   try {
     const produit = await Product.findById(req.params.id);
-
-    if (!produit) {
-      return res.status(404).json({
-        succes: false,
-        message: 'Produit introuvable.'
-      });
+    if (!produit) return res.status(404).json({ succes: false, message: 'Produit introuvable.' });
+    if (produit.fournisseur.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ succes: false, message: 'Vous n\'êtes pas autorisé à supprimer ce produit.' });
     }
 
-    // Vérifier que l'utilisateur est le propriétaire
-    if (produit.fournisseur.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        succes: false,
-        message: 'Vous n\'êtes pas autorisé à supprimer ce produit.'
-      });
+    // Supprimer images Cloudinary (si configured)
+    if (produit.images && produit.images.length > 0) {
+      for (const img of produit.images) {
+        try {
+          if (img.public_id) {
+            await cloudinary.uploader.destroy(img.public_id, { resource_type: 'image' });
+          }
+        } catch (e) {
+          console.warn('Erreur suppression image Cloudinary', img.public_id, e.message);
+          // continuer la suppression produit même si une image échoue
+        }
+      }
     }
 
     await produit.deleteOne();
 
-    res.status(200).json({
-      succes: true,
-      message: 'Produit supprimé avec succès !'
-    });
+    res.status(200).json({ succes: true, message: 'Produit supprimé avec succès !' });
   } catch (error) {
-    res.status(500).json({
-      succes: false,
-      message: 'Erreur lors de la suppression du produit.'
-    });
+    console.error('Erreur suppression produit:', error);
+    res.status(500).json({ succes: false, message: 'Erreur lors de la suppression du produit.' });
   }
 });
 
