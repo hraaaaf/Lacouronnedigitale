@@ -11,6 +11,32 @@ const upload = require('../middleware/upload');
 // IMPORTANT : Cloudinary doit être configuré ailleurs (process.env.CLOUDINARY_URL ou cloudinary.config)
 
 // GET /api/produits
+
+
+// GET /api/produits/fournisseur/mes-produits
+router.get('/fournisseur/mes-produits', proteger, autoriser('fournisseur'), async (req, res) => {
+  try {
+    const produits = await Product.find({ fournisseur: req.user._id }).sort({ createdAt: -1 });
+    res.status(200).json({ succes: true, count: produits.length, produits });
+  } catch (error) {
+    res.status(500).json({ succes: false, message: 'Erreur lors de la récupération des produits.' });
+  }
+});
+
+// GET /api/produits/:id
+router.get('/:id', async (req, res) => {
+  try {
+    const produit = await Product.findById(req.params.id).populate('fournisseur', 'nom prenom entreprise telephone email stats');
+    if (!produit) return res.status(404).json({ succes: false, message: 'Produit introuvable.' });
+    produit.vues += 1;
+    await produit.save();
+    res.status(200).json({ succes: true, produit });
+  } catch (error) {
+    console.error('Erreur récupération produit:', error);
+    res.status(500).json({ succes: false, message: 'Erreur lors de la récupération du produit ou ID invalide.' });
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const { categorie, ville, prixMin, prixMax, recherche, page = 1, limite = 20 } = req.query;
@@ -40,30 +66,6 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('Erreur récupération produits:', error);
     res.status(500).json({ succes: false, message: 'Erreur lors de la récupération des produits.' });
-  }
-});
-
-// GET /api/produits/fournisseur/mes-produits
-router.get('/fournisseur/mes-produits', proteger, autoriser('fournisseur'), async (req, res) => {
-  try {
-    const produits = await Product.find({ fournisseur: req.user._id }).sort({ createdAt: -1 });
-    res.status(200).json({ succes: true, count: produits.length, produits });
-  } catch (error) {
-    res.status(500).json({ succes: false, message: 'Erreur lors de la récupération des produits.' });
-  }
-});
-
-// GET /api/produits/:id
-router.get('/:id', async (req, res) => {
-  try {
-    const produit = await Product.findById(req.params.id).populate('fournisseur', 'nom prenom entreprise telephone email stats');
-    if (!produit) return res.status(404).json({ succes: false, message: 'Produit introuvable.' });
-    produit.vues += 1;
-    await produit.save();
-    res.status(200).json({ succes: true, produit });
-  } catch (error) {
-    console.error('Erreur récupération produit:', error);
-    res.status(500).json({ succes: false, message: 'Erreur lors de la récupération du produit ou ID invalide.' });
   }
 });
 
