@@ -5,8 +5,10 @@ const Product = require('../models/Product');
 const { proteger, autoriser, verifierAbonnement } = require('../middleware/auth');
 const cloudinary = require('cloudinary').v2;
 
-// IMPORTANT : Cloudinary doit être configuré ailleurs (process.env.CLOUDINARY_URL ou cloudinary.config)
+// --- CORRECTION : Import du middleware Multer ---
+const upload = require('../middleware/upload'); 
 
+// IMPORTANT : Cloudinary doit être configuré ailleurs (process.env.CLOUDINARY_URL ou cloudinary.config)
 
 // GET /api/produits
 router.get('/', async (req, res) => {
@@ -66,9 +68,6 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/produits
-// Cloudinary-only flow: le frontend doit avoir uploadé l'image(s) vers Cloudinary et envoie ici `req.body.images`
-// Ex: images = [{ url: 'https://res.cloudinary.com/..../image.jpg', public_id: 'produits/abcd', altText: '...' }, ...]
-
 router.post('/', proteger, autoriser('fournisseur'), upload.array('images', 5), async (req, res) => {
   try {
     // 1. Gestion des images Cloudinary
@@ -91,26 +90,23 @@ router.post('/', proteger, autoriser('fournisseur'), upload.array('images', 5), 
     }
 
     // 2. Construction intelligente de l'objet Produit
-    // On extrait les champs simples
     const { nom, description, prix, categorie, marque, conditionnement } = req.body;
 
-    // On prépare le stock manuellement pour satisfaire Mongoose
-    // On accepte soit "stock" (nombre direct), soit "stock[quantite]"
+    // Gestion stock (compatible FormData)
     const quantiteStock = req.body.stock || req.body['stock[quantite]'];
 
     const nouveauProduit = new Product({
       nom,
       description,
-      prix: parseFloat(prix), // On s'assure que c'est un nombre
+      prix: parseFloat(prix),
       categorie,
       marque,
-      // Ici est la correction magique :
       stock: {
         quantite: parseInt(quantiteStock, 10),
-        unite: conditionnement || 'unité' // On utilise le conditionnement comme unité ou par défaut 'unité'
+        unite: conditionnement || 'unité'
       },
       images: imagesUrls,
-      fournisseur: req.user._id // On lie le produit au fournisseur connecté
+      fournisseur: req.user._id
     });
 
     // 3. Sauvegarde
@@ -123,10 +119,6 @@ router.post('/', proteger, autoriser('fournisseur'), upload.array('images', 5), 
 
   } catch (error) {
     console.error('Erreur création produit:', error);
-    // Si erreur, on supprime les images uploadées pour ne pas polluer Cloudinary
-    /* (Code optionnel de nettoyage ici) */
-    
-    // On renvoie l'erreur précise pour t'aider à débugger
     res.status(400).json({ 
       succes: false, 
       message: error.message || 'Erreur lors de la création du produit' 
@@ -143,7 +135,6 @@ router.put('/:id', proteger, autoriser('fournisseur'), verifierAbonnement, async
       return res.status(403).json({ succes: false, message: 'Vous n\'êtes pas autorisé à modifier ce produit.' });
     }
 
-    // Si le frontend envoie `images` (mise à jour), on accepte la nouvelle valeur (expects url+public_id)
     if (req.body.images) {
       let images = Array.isArray(req.body.images) ? req.body.images : (() => {
         try { return JSON.parse(req.body.images); } catch { return []; }
@@ -162,7 +153,6 @@ router.put('/:id', proteger, autoriser('fournisseur'), verifierAbonnement, async
 });
 
 // DELETE /api/produits/:id
-// Supprime aussi les images côté Cloudinary si public_id présent
 router.delete('/:id', proteger, autoriser('fournisseur'), async (req, res) => {
   try {
     const produit = await Product.findById(req.params.id);
@@ -171,7 +161,6 @@ router.delete('/:id', proteger, autoriser('fournisseur'), async (req, res) => {
       return res.status(403).json({ succes: false, message: 'Vous n\'êtes pas autorisé à supprimer ce produit.' });
     }
 
-    // Supprimer images Cloudinary (si configured)
     if (produit.images && produit.images.length > 0) {
       for (const img of produit.images) {
         try {
@@ -180,7 +169,6 @@ router.delete('/:id', proteger, autoriser('fournisseur'), async (req, res) => {
           }
         } catch (e) {
           console.warn('Erreur suppression image Cloudinary', img.public_id, e.message);
-          // continuer la suppression produit même si une image échoue
         }
       }
     }
