@@ -1,59 +1,75 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Archivo:wght@400;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @import "tailwindcss";
 
 @theme {
-  /* Palette Simplifiée : Bleu Médical & Ardoise */
-  --color-primary-500: #0ea5e9;
-  --color-primary-600: #0284c7;
-  --color-slate-900: #0f172a;
+  /* --- PALETTE "CLINIQUE PRO" --- */
   
-  /* Ombre plus fine, moins colorée pour faire "pro" */
-  --shadow-premium: 0 10px 30px rgba(15, 23, 42, 0.04), 0 0 1px rgba(15, 23, 42, 0.1);
+  /* Un bleu médical, rassurant et tech (Teinte Sky/Blue) */
+  --color-primary-50: #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  --color-primary-500: #0ea5e9; /* Couleur principale */
+  --color-primary-600: #0284c7; /* Hover */
+  --color-primary-700: #0369a1; /* Active */
+
+  /* Gris neutres pour le texte (Slate) */
+  --color-slate-50: #f8fafc;  /* Fond de page */
+  --color-slate-100: #f1f5f9; /* Bordures */
+  --color-slate-200: #e2e8f0; /* Séparateurs */
+  --color-slate-500: #64748b; /* Texte secondaire */
+  --color-slate-900: #0f172a; /* Titres */
+
+  /* Ombres ultra-légères (Style SaaS moderne) */
+  --shadow-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.02), 0 2px 4px -2px rgb(0 0 0 / 0.02);
+  --shadow-floating: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
 }
 
 @layer base {
   body {
-    @apply bg-[#F8FAFC] text-[#0F172A] antialiased;
+    @apply bg-slate-50 text-slate-900 antialiased;
     font-family: 'Inter', sans-serif;
   }
 
-  /* On oublie le gros dégradé violet, on met une grille ultra-légère */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: radial-gradient(rgba(14, 165, 233, 0.03) 1px, transparent 1px);
-    background-size: 30px 30px;
-    z-index: -1;
+  /* Titres : Sombres et nets */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight text-slate-900;
   }
 }
 
 @layer components {
-  /* La carte : Fond blanc pur, bords très arrondis, ombre légère */
+  /* --- COMPOSANTS UI --- */
+
+  /* La Carte Pro : Fond blanc, bordure fine, ombre discrète */
   .card {
-    @apply bg-white border border-slate-100 rounded-[2rem] p-6
-           transition-all duration-500 shadow-sm hover:shadow-premium hover:-translate-y-1;
+    @apply bg-white border border-slate-200 rounded-xl p-6 shadow-card transition-all duration-200;
+  }
+  
+  /* Effet hover sur les cartes cliquables */
+  .card-hover {
+    @apply hover:border-primary-500/30 hover:shadow-floating hover:-translate-y-0.5;
   }
 
-  /* Le bouton : Noir profond, texte blanc (Style Apple/SaaS) */
+  /* Le Bouton Principal : Sérieux, lisible */
   .btn-primary {
-    @apply bg-[#0F172A] text-white px-8 py-4 rounded-2xl font-bold
-           transition-all duration-300 hover:bg-primary-500 hover:scale-[1.02] active:scale-95;
+    @apply inline-flex items-center justify-center bg-primary-600 text-white px-6 py-3 rounded-lg font-medium shadow-subtle
+           transition-all duration-200 hover:bg-primary-700 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
-  /* Inputs : Gris très léger, focus bleu azur */
+  /* Le Bouton Secondaire : Bordure grise, fond blanc */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center bg-white text-slate-700 border border-slate-300 px-6 py-3 rounded-lg font-medium shadow-subtle
+           transition-all duration-200 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100;
+  }
+
+  /* Les Champs de Formulaire (Inputs) */
   .input-field {
-    @apply w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 
-           transition-all focus:bg-white focus:border-primary-500 outline-none;
+    @apply w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder-slate-400 
+           focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all;
   }
 
-  .gradient-text {
-    @apply font-black bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-primary-500;
+  /* Badges et Labels */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
 }
-
-/* Scrollbar discrète */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
