@@ -87,63 +87,47 @@ router.get('/:id', async (req, res) => {
 // 2. ROUTES D'ÉCRITURE (POST, PUT, DELETE)
 // ==========================================
 
+
 /**
- * @desc    Créer un produit (Fournisseur uniquement)
+ * @desc    Créer un nouveau produit (avec images)
  * @route   POST /api/produits
  */
-
 router.post('/', proteger, autoriser('fournisseur'), verifierAbonnement, upload.array('images', 5), async (req, res) => {
   try {
-    // --- 1. LOGS DE DÉBOGAGE (À regarder dans Railway si ça plante) ---
-    console.log("=== DÉBUT CRÉATION PRODUIT ===");
-    console.log("User ID:", req.user._id);
-    console.log("Données reçues (Body):", req.body);
-    console.log("Fichiers reçus:", req.files ? req.files.length : "Aucun");
-
-    // --- 2. GESTION DES IMAGES (Upload vers Cloudinary) ---
     let imagesLinks = [];
     
+    // Upload vers Cloudinary
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
-        // Transformation du Buffer en chaîne base64 lisible par Cloudinary
         const b64 = Buffer.from(file.buffer).toString('base64');
         let dataURI = "data:" + file.mimetype + ";base64," + b64;
 
-        // Envoi à Cloudinary
         const result = await cloudinary.uploader.upload(dataURI, {
-          folder: 'dental-market/produits', // Nom de ton dossier sur Cloudinary
+          folder: 'dental-market/produits',
         });
 
-        // On garde juste ce qu'il faut pour le Schema Mongoose
         imagesLinks.push({
           public_id: result.public_id,
           url: result.secure_url,
         });
       }
-      console.log(`> ${imagesLinks.length} images uploadées sur Cloudinary.`);
-    } else {
-      console.log("> Aucune image fournie.");
     }
 
-    // --- 3. FORMATAGE DU STOCK ---
-    // FormData envoie tout en string. On s'assure que le stock respecte le Schema { quantite: Number, unite: String }
+    // Formatage du stock
     const stockFormatte = {
         quantite: req.body.stock ? Number(req.body.stock) : 0,
-        unite: req.body.conditionnement || 'unité' // On utilise le conditionnement comme unité par défaut, sinon 'unité'
+        unite: req.body.conditionnement || 'unité'
     };
 
-    // --- 4. CRÉATION DU PRODUIT ---
+    // Création de l'objet produit
     const produitData = {
-      ...req.body,                 // Prend nom, description, prix, categorie, marque...
-      stock: stockFormatte,        // Écrase le stock "string" par l'objet structuré
-      images: imagesLinks,         // Ajoute les URLs Cloudinary
-      fournisseur: req.user._id    // Lie le produit au fournisseur connecté
+      ...req.body,
+      stock: stockFormatte,
+      images: imagesLinks,
+      fournisseur: req.user._id
     };
 
     const nouveauProduit = await Product.create(produitData);
-
-    console.log("Produit créé avec succès ID:", nouveauProduit._id);
-    console.log("================================");
 
     res.status(201).json({
       succes: true,
@@ -151,7 +135,7 @@ router.post('/', proteger, autoriser('fournisseur'), verifierAbonnement, upload.
     });
 
   } catch (error) {
-    console.error("ERREUR CRÉATION PRODUIT :", error);
+    console.error("Erreur création produit:", error);
     res.status(500).json({
       succes: false,
       message: "Erreur lors de la création du produit.",
