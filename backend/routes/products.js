@@ -91,45 +91,72 @@ router.get('/:id', async (req, res) => {
  * @desc    Créer un produit (Fournisseur uniquement)
  * @route   POST /api/produits
  */
+
 router.post('/', proteger, autoriser('fournisseur'), verifierAbonnement, upload.array('images', 5), async (req, res) => {
   try {
-    // 1. Upload des images vers Cloudinary
-    const imagesUrls = [];
+    // --- 1. LOGS DE DÉBOGAGE (À regarder dans Railway si ça plante) ---
+    console.log("=== DÉBUT CRÉATION PRODUIT ===");
+    console.log("User ID:", req.user._id);
+    console.log("Données reçues (Body):", req.body);
+    console.log("Fichiers reçus:", req.files ? req.files.length : "Aucun");
+
+    // --- 2. GESTION DES IMAGES (Upload vers Cloudinary) ---
+    let imagesLinks = [];
+    
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
+        // Transformation du Buffer en chaîne base64 lisible par Cloudinary
         const b64 = Buffer.from(file.buffer).toString('base64');
         let dataURI = "data:" + file.mimetype + ";base64," + b64;
-        const result = await cloudinary.uploader.upload(dataURI, { folder: 'dental_market/products' });
-        imagesUrls.push({ url: result.secure_url, public_id: result.public_id });
+
+        // Envoi à Cloudinary
+        const result = await cloudinary.uploader.upload(dataURI, {
+          folder: 'dental-market/produits', // Nom de ton dossier sur Cloudinary
+        });
+
+        // On garde juste ce qu'il faut pour le Schema Mongoose
+        imagesLinks.push({
+          public_id: result.public_id,
+          url: result.secure_url,
+        });
       }
+      console.log(`> ${imagesLinks.length} images uploadées sur Cloudinary.`);
+    } else {
+      console.log("> Aucune image fournie.");
     }
 
-    // 2. Préparation des données
-    const { nom, description, prix, categorie, marque, conditionnement } = req.body;
-    
-    // Correction du parsing pour le stock (depuis FormData)
-    const quantiteStock = req.body.stock || req.body['stock[quantite]'] || 0;
+    // --- 3. FORMATAGE DU STOCK ---
+    // FormData envoie tout en string. On s'assure que le stock respecte le Schema { quantite: Number, unite: String }
+    const stockFormatte = {
+        quantite: req.body.stock ? Number(req.body.stock) : 0,
+        unite: req.body.conditionnement || 'unité' // On utilise le conditionnement comme unité par défaut, sinon 'unité'
+    };
 
-    const nouveauProduit = new Product({
-      nom,
-      description,
-      prix: parseFloat(prix),
-      categorie,
-      marque,
-      stock: {
-        quantite: parseInt(quantiteStock, 10),
-        unite: conditionnement || 'unité'
-      },
-      images: imagesUrls,
-      fournisseur: req.user._id
+    // --- 4. CRÉATION DU PRODUIT ---
+    const produitData = {
+      ...req.body,                 // Prend nom, description, prix, categorie, marque...
+      stock: stockFormatte,        // Écrase le stock "string" par l'objet structuré
+      images: imagesLinks,         // Ajoute les URLs Cloudinary
+      fournisseur: req.user._id    // Lie le produit au fournisseur connecté
+    };
+
+    const nouveauProduit = await Product.create(produitData);
+
+    console.log("Produit créé avec succès ID:", nouveauProduit._id);
+    console.log("================================");
+
+    res.status(201).json({
+      succes: true,
+      produit: nouveauProduit
     });
 
-    const sauvegarde = await nouveauProduit.save();
-    res.status(201).json({ succes: true, data: sauvegarde });
-
   } catch (error) {
-    console.error('Erreur POST produit:', error);
-    res.status(400).json({ succes: false, message: error.message });
+    console.error("ERREUR CRÉATION PRODUIT :", error);
+    res.status(500).json({
+      succes: false,
+      message: "Erreur lors de la création du produit.",
+      error: error.message
+    });
   }
 });
 
